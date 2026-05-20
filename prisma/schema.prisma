@@ -1,0 +1,101 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                       String           @id
+  firstName                String
+  lastName                 String
+  email                    String?
+  role                     String   // teacher or student
+  telegramUsername         String?
+  telegramId               String?
+  avatarUrl                String?
+  schoolName               String?
+  inviteCode               String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  teacherStudentsAsStudent TeacherStudent[] @relation("StudentRelation")
+  teacherStudentsAsTeacher TeacherStudent[] @relation("TeacherRelation")
+}
+
+model TeacherStudent {
+  id         String   @id @default(cuid())
+  teacherId  String
+  studentId  String
+  inviteCode String?
+  linkedAt   DateTime @default(now())
+
+  teacher    User     @relation("TeacherRelation", fields: [teacherId], references: [id])
+  student    User     @relation("StudentRelation", fields: [studentId], references: [id])
+}
+
+model Assignment {
+  id             String   @id @default(cuid())
+  teacherId      String
+  studentId      String
+  title          String
+  description    String
+  dueDate        DateTime
+  attachmentName String?
+  attachmentUrl  String?
+  groupId        String?
+  status         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ProgressUpdate {
+  id                   String   @id @default(cuid())
+  assignmentId         String
+  studentId            String
+  message              String
+  aiStatus             String?
+  needsTeacherAttention Boolean @default(false)
+  createdAt            DateTime @default(now())
+}
+
+model Submission {
+  id           String   @id @default(cuid())
+  assignmentId String
+  studentId    String
+  content      String?
+  fileName     String?
+  fileUrl      String?
+  submittedAt  DateTime @default(now())
+}
+
+model Feedback {
+  id           String   @id @default(cuid())
+  assignmentId String
+  teacherId    String
+  studentId    String
+  message      String
+  createdAt    DateTime @default(now())
+}
+
+model Reminder {
+  id           String    @id @default(cuid())
+  assignmentId String
+  reminderType String
+  message      String
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("pending")
+}
+
+model AppSettings {
+  id              String   @id @default(cuid())
+  teacherId       String   @unique
+  llmProvider     String?
+  llmModel        String?
+  encryptedApiKey String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
