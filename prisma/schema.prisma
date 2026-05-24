@@ -11,18 +11,32 @@ model User {
   id                       String           @id
   firstName                String
   lastName                 String
-  email                    String?
+  email                    String?          @unique
   role                     String   // teacher or student
   telegramUsername         String?
   telegramId               String?
   avatarUrl                String?
   schoolName               String?
   inviteCode               String?
+  passwordHash             String?
+  suspendedAt              DateTime?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
   teacherStudentsAsStudent TeacherStudent[] @relation("StudentRelation")
   teacherStudentsAsTeacher TeacherStudent[] @relation("TeacherRelation")
+  sessions                 Session[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model TeacherStudent {

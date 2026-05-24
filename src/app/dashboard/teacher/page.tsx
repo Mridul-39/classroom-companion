@@ -9,13 +9,17 @@ import { AssignmentTable } from "@/components/assignments/AssignmentTable";
 import { Users, FileText, Sparkles, CheckCircle, ArrowRight, Loader2, FileIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { useSession } from "@/lib/session";
 
 export default function TeacherDashboard() {
+  const { session } = useSession();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/teacher/dashboard?teacherId=teacher-meera')
+    if (!session) return;
+    fetch(`/api/teacher/dashboard?teacherId=${session.userId}`)
       .then(res => res.json())
       .then(res => {
         setData(res);
@@ -25,7 +29,7 @@ export default function TeacherDashboard() {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [session]);
 
   if (loading) {
     return (

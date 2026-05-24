@@ -10,14 +10,16 @@ import { buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FileIcon, SearchX, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { DEMO_TEACHER_ID } from "@/lib/constants";
+import { useSession } from "@/lib/session";
 
 export default function TeacherSubmissionsPage() {
+  const { session } = useSession();
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/submissions?teacherId=${DEMO_TEACHER_ID}`)
+    if (!session) return;
+    fetch(`/api/submissions?teacherId=${session.userId}`)
       .then(res => res.json())
       .then(data => {
         setSubmissions(data.submissions || []);
@@ -27,7 +29,7 @@ export default function TeacherSubmissionsPage() {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [session]);
 
   return (
     <DashboardShell role="teacher">

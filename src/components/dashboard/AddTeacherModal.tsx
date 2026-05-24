@@ -10,7 +10,7 @@ import { Loader2, Plus } from "lucide-react";
 export function AddTeacherModal({ teacherId }: { teacherId: string }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ firstName: "", lastName: "", email: "", schoolName: "" });
+  const [formData, setFormData] = useState({ firstName: "", lastName: "", email: "" });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +25,7 @@ export function AddTeacherModal({ teacherId }: { teacherId: string }) {
 
       if (res.ok) {
         setOpen(false);
-        setFormData({ firstName: "", lastName: "", email: "", schoolName: "" });
+        setFormData({ firstName: "", lastName: "", email: "" });
         window.location.reload();
       } else {
         const error = await res.json();
@@ -40,10 +40,8 @@ export function AddTeacherModal({ teacherId }: { teacherId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Plus className="h-4 w-4" /> Invite Teacher
-        </Button>
+      <DialogTrigger render={<Button variant="outline" className="gap-2" />}>
+        <Plus className="h-4 w-4" /> Invite Teacher
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
@@ -66,10 +64,6 @@ export function AddTeacherModal({ teacherId }: { teacherId: string }) {
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
             <Input id="email" type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="schoolName">Organization</Label>
-            <Input id="schoolName" required value={formData.schoolName} onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })} />
           </div>
           <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

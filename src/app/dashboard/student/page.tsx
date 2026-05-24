@@ -6,11 +6,13 @@ import { AssignmentCard } from "@/components/assignments/AssignmentCard";
 import { FileText, Clock, AlertCircle, CheckCircle, BookOpen, Loader2 } from "lucide-react";
 import { Assignment } from "@/lib/types";
 import { useApiPoll } from "@/hooks/useApiPoll";
-import { DEMO_STUDENT_ID, DASHBOARD_POLL_MS } from "@/lib/constants";
+import { DASHBOARD_POLL_MS } from "@/lib/constants";
+import { useSession } from "@/lib/session";
 
 export default function StudentDashboard() {
+  const { session } = useSession();
   const { data, loading, error } = useApiPoll<any>(
-    `/api/student/dashboard?studentId=${DEMO_STUDENT_ID}`,
+    session ? `/api/student/dashboard?studentId=${session.userId}` : null,
     DASHBOARD_POLL_MS
   );
 

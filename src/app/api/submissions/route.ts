@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const teacherId = searchParams.get('teacherId');
-
-  if (!teacherId) {
-    return NextResponse.json({ error: 'teacherId is required' }, { status: 400 });
+export async function GET() {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const teacherId = session.user.id;
 
   try {
     const assignments = await db.assignment.findMany({
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       select: { id: true, title: true, teacherId: true },
     });
 
-    const assignmentIds = assignments.map(a => a.id);
+    const assignmentIds = assignments.map((a) => a.id);
 
     const submissionsList = await db.submission.findMany({
       where: {
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
     const formattedSubmissions = await Promise.all(
       submissionsList.map(async (sub) => {
-        const assignment = assignments.find(a => a.id === sub.assignmentId);
+        const assignment = assignments.find((a) => a.id === sub.assignmentId);
         const student = await db.user.findUnique({ where: { id: sub.studentId } });
         return {
           sub,

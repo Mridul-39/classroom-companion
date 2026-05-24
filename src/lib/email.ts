@@ -178,3 +178,35 @@ export async function sendRegistrationConfirmationEmail({
     ].join('\n'),
   });
 }
+
+export async function sendLoginCredentialsEmail({
+  to,
+  firstName,
+  role,
+  tempPassword,
+}: {
+  to: string;
+  firstName: string;
+  role: 'student' | 'teacher';
+  tempPassword: string;
+}): Promise<EmailDeliveryResult> {
+  const baseUrl = process.env.APP_BASE_URL ?? 'http://localhost:3000';
+  return sendEmail({
+    to,
+    subject: 'Your Classroom Companion login',
+    text: [
+      `Hi ${firstName},`,
+      '',
+      `Your ${role} account is ready. Use the credentials below to sign in to the web dashboard.`,
+      '',
+      `Sign-in URL: ${baseUrl}/login`,
+      `Email:       ${to}`,
+      `Password:    ${tempPassword}`,
+      '',
+      'Tip: change your password from Telegram any time with:',
+      '  /setpassword <your new password>',
+      '',
+      '— Classroom Companion',
+    ].join('\n'),
+  });
+}

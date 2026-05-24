@@ -1,12 +1,30 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sendTeacherInviteEmail } from '@/lib/email';
+import { getSession } from '@/lib/auth';
 
 export async function GET() {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const teachers = await db.user.findMany({
       where: { role: 'teacher' },
       orderBy: { firstName: 'asc' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        avatarUrl: true,
+        telegramUsername: true,
+        telegramId: true,
+        suspendedAt: true,
+        schoolName: true,
+        inviteCode: true,
+      },
     });
 
     return NextResponse.json({ teachers });
@@ -17,17 +35,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const { firstName, lastName, email, schoolName, inviterId } = body;
+    const { firstName, lastName, email, schoolName } = body;
 
-    if (!firstName || !lastName || !email || !inviterId) {
+    if (!firstName || !lastName || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const inviter = await db.user.findUnique({ where: { id: inviterId } });
-    const adminName = inviter ? `${inviter.firstName} ${inviter.lastName}` : 'Your administrator';
+    const adminName = `${session.user.firstName} ${session.user.lastName}`;
 
     let teacher = await db.user.findFirst({ where: { email: normalizedEmail } });
     const inviteCode = `INV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;

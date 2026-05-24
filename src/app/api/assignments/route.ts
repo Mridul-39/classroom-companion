@@ -2,21 +2,20 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { scheduleRemindersForAssignment } from '@/lib/telegram/reminders';
+import { getSession } from '@/lib/auth';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const role = searchParams.get('role');
-  const teacherId = searchParams.get('teacherId');
-  const studentId = searchParams.get('studentId');
+export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const whereClause =
+    session.user.role === 'teacher'
+      ? { teacherId: session.user.id }
+      : { studentId: session.user.id };
 
   try {
-    let whereClause = {};
-    if (role === 'teacher' && teacherId) {
-      whereClause = { teacherId };
-    } else if (role === 'student' && studentId) {
-      whereClause = { studentId };
-    }
-
     const assignmentsList = await db.assignment.findMany({
       where: whereClause,
       orderBy: { dueDate: 'asc' },
@@ -40,10 +39,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const teacherId = session.user.id;
+
   try {
     const body = await request.json();
     const {
-      teacherId,
       studentId,
       studentIds,
       title,
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
       attachmentName,
     } = body;
 
-    if (!teacherId || !title || !dueDate) {
+    if (!title || !dueDate) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 

@@ -11,7 +11,7 @@ import { SubmissionPanel } from "@/components/assignments/SubmissionPanel";
 import { FeedbackPanel } from "@/components/assignments/FeedbackPanel";
 import { EmptyState } from "@/components/ui-custom/EmptyState";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, Bell, SearchX, Mail, MessageSquare, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Bell, SearchX, Mail, MessageSquare, Loader2, FileIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -162,8 +162,22 @@ export default function TeacherAssignmentDetail() {
               <CardHeader className="bg-zinc-50/50 border-b border-zinc-100 pb-4">
                 <CardTitle className="text-base font-semibold text-zinc-900">Assignment Details</CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 space-y-4">
                 <p className="whitespace-pre-wrap text-zinc-700 leading-relaxed">{assignment.description}</p>
+                {assignment.attachmentUrl && (
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                    <p className="text-sm font-medium text-zinc-900">Attachment</p>
+                    <a
+                      href={assignment.attachmentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                    >
+                      <FileIcon className="h-4 w-4" />
+                      {assignment.attachmentName || 'Open attachment'}
+                    </a>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

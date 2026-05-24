@@ -4,22 +4,24 @@ import { useState, useEffect } from "react";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { PageHeader } from "@/components/ui-custom/PageHeader";
 import { EmptyState } from "@/components/ui-custom/EmptyState";
-import { DEMO_STUDENT_ID } from "@/lib/constants";
 import { BookOpen, Loader2 } from "lucide-react";
 import { Assignment } from "@/lib/types";
+import { useSession } from "@/lib/session";
 
 export default function StudentAssignments() {
+  const { session } = useSession();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/student/dashboard?studentId=${DEMO_STUDENT_ID}`)
+    if (!session) return;
+    fetch(`/api/student/dashboard?studentId=${session.userId}`)
       .then((res) => res.json())
       .then(() => setLoading(false))
       .catch((err) => {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [session]);
 
   return (
     <DashboardShell role="student">

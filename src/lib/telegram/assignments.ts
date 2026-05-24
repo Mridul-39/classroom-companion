@@ -155,6 +155,28 @@ export async function addSubmission(
   return { submission, assignment };
 }
 
+export async function attachAssignmentFile(
+  assignmentId: string,
+  url: string,
+  name: string
+) {
+  return db.assignment.update({
+    where: { id: assignmentId },
+    data: { attachmentUrl: url, attachmentName: name },
+  });
+}
+
+export async function attachSubmissionFile(
+  submissionId: string,
+  url: string,
+  name: string
+) {
+  return db.submission.update({
+    where: { id: submissionId },
+    data: { fileUrl: url, fileName: name },
+  });
+}
+
 export async function addTeacherFeedback(
   assignmentId: string,
   teacherId: string,

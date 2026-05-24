@@ -14,10 +14,10 @@ export default function LandingPage() {
           <span className="text-lg font-bold tracking-tight">Classroom Companion</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/student" className={cn(buttonVariants({ variant: "ghost" }), "font-medium text-zinc-600 hover:text-zinc-900")}>
+          <Link href="/login?role=student" className={cn(buttonVariants({ variant: "ghost" }), "font-medium text-zinc-600 hover:text-zinc-900")}>
             Student Login
           </Link>
-          <Link href="/dashboard/teacher" className={cn(buttonVariants(), "bg-zinc-900 hover:bg-zinc-800 text-white font-medium shadow-sm")}>
+          <Link href="/login?role=teacher" className={cn(buttonVariants(), "bg-zinc-900 hover:bg-zinc-800 text-white font-medium shadow-sm")}>
             Teacher Login
           </Link>
         </div>
@@ -42,11 +42,11 @@ export default function LandingPage() {
               </p>
               
               <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-                <Link href="/dashboard/teacher" className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto h-12 text-base px-8 gap-2 bg-zinc-900 hover:bg-zinc-800 text-white shadow-md")}>
+                <Link href="/login?role=teacher" className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto h-12 text-base px-8 gap-2 bg-zinc-900 hover:bg-zinc-800 text-white shadow-md")}>
                   <GraduationCap className="h-5 w-5" />
                   View Teacher Dashboard
                 </Link>
-                <Link href="/dashboard/student" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "w-full sm:w-auto h-12 text-base px-8 gap-2 border-zinc-300 text-zinc-700 hover:bg-zinc-100")}>
+                <Link href="/login?role=student" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "w-full sm:w-auto h-12 text-base px-8 gap-2 border-zinc-300 text-zinc-700 hover:bg-zinc-100")}>
                   <Users className="h-5 w-5" />
                   View Student Dashboard
                 </Link>

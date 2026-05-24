@@ -8,17 +8,18 @@ import { PageHeader } from "@/components/ui-custom/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BellRing, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { DEMO_TEACHER_ID } from "@/lib/constants";
+import { useSession } from "@/lib/session";
 
 export default function TeacherSettings() {
+  const { session } = useSession();
   const [data, setData] = useState<{ teacher: any, settings: any } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // We can fetch both user and settings
+    if (!session) return;
     Promise.all([
-      fetch(`/api/teacher/dashboard?teacherId=${DEMO_TEACHER_ID}`).then(res => res.json()),
-      fetch(`/api/settings?teacherId=${DEMO_TEACHER_ID}`).then(res => res.json())
+      fetch(`/api/teacher/dashboard?teacherId=${session.userId}`).then(res => res.json()),
+      fetch(`/api/settings?teacherId=${session.userId}`).then(res => res.json())
     ])
     .then(([teacherData, settingsData]) => {
       setData({
@@ -31,7 +32,7 @@ export default function TeacherSettings() {
       console.error(err);
       setLoading(false);
     });
-  }, []);
+  }, [session]);
 
   return (
     <DashboardShell role="teacher">

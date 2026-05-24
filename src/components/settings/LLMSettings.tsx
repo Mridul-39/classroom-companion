@@ -1,6 +1,6 @@
 "use client";
 
-import { Teacher } from "@/lib/types";
+import type { AppSettings } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Bot, Key, Sparkles } from "lucide-react";
 
-export function LLMSettings({ settings }: { settings?: Teacher['llmSettings'] }) {
+export function LLMSettings({ settings }: { settings?: AppSettings | null }) {
   return (
     <Card className="shadow-sm border-zinc-200">
       <CardHeader className="bg-zinc-50/50 border-b border-zinc-100 pb-4">

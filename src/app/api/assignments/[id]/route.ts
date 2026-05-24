@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { id } = await params;
 
   try {
@@ -11,6 +17,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     if (!assignment) {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 });
+    }
+
+    if (
+      assignment.teacherId !== session.user.id &&
+      assignment.studentId !== session.user.id
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const student = await db.user.findUnique({ where: { id: assignment.studentId } });

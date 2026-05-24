@@ -1,32 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const studentId = searchParams.get('studentId');
-
-  if (!studentId) {
-    return NextResponse.json({ error: 'studentId is required' }, { status: 400 });
+export async function GET() {
+  const session = await getSession();
+  if (!session || session.user.role !== 'student') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const student = session.user;
+  const effectiveStudentId = student.id;
+
   try {
-    let student = await db.user.findUnique({
-      where: { id: studentId },
-    });
-
-    if (!student) {
-        // If the requested demo student isn't present in the DB (dev setups vary),
-        // fall back to the first available student so the frontend can still render.
-        const fallback = await db.user.findFirst({ where: { role: 'student' } });
-        if (!fallback) {
-          return NextResponse.json({ error: 'Student not found' }, { status: 404 });
-        }
-        // use the fallback student for the dashboard
-        student = fallback;
-    }
-
-    // Use the resolved student's id for subsequent queries (handles fallback)
-    const effectiveStudentId = student.id;
 
     const rows = await db.assignment.findMany({
       where: { studentId: effectiveStudentId },

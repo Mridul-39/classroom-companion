@@ -1,13 +1,21 @@
 import type { User } from '@prisma/client';
 import type TelegramBot from 'node-telegram-bot-api';
 import { db } from '@/lib/db';
-import { DEMO_TEACHER_ID } from '@/lib/constants';
-import { sendRegistrationConfirmationEmail } from '@/lib/email';
+import { sendRegistrationConfirmationEmail, sendLoginCredentialsEmail } from '@/lib/email';
+import { generateTempPassword, hashPassword } from '@/lib/passwords';
 
 type TelegramFrom = TelegramBot.User;
 
 /** Only stable identifier: Telegram numeric user id (set on register/link). */
 export async function resolveUser(from: TelegramFrom): Promise<User | null> {
+  const user = await db.user.findFirst({ where: { telegramId: String(from.id) } });
+  // Treat suspended users as not signed in; callers will tell them why.
+  if (user?.suspendedAt) return null;
+  return user;
+}
+
+/** Look up the user including suspended accounts — used for clearer messaging. */
+export async function resolveUserIncludingSuspended(from: TelegramFrom): Promise<User | null> {
   return db.user.findFirst({ where: { telegramId: String(from.id) } });
 }
 
@@ -24,6 +32,30 @@ async function attachTelegramProfile(
       ...(username ? { telegramUsername: username } : {}),
     },
   });
+}
+
+/**
+ * Issue a fresh temp password for a user that has no password yet.
+ * Sends the plaintext via email (best-effort) and returns it so the bot can
+ * also DM it in chat. Returns null if the user already has a password.
+ */
+async function issueTempPasswordIfMissing(user: User): Promise<string | null> {
+  if (user.passwordHash) return null;
+
+  const tempPassword = generateTempPassword();
+  const hash = await hashPassword(tempPassword);
+  await db.user.update({ where: { id: user.id }, data: { passwordHash: hash } });
+
+  if (user.email) {
+    await sendLoginCredentialsEmail({
+      to: user.email,
+      firstName: user.firstName,
+      role: user.role as 'student' | 'teacher',
+      tempPassword,
+    }).catch((err) => console.warn('[email] credentials email failed:', err));
+  }
+
+  return tempPassword;
 }
 
 export type RegisterInput = {
@@ -47,13 +79,13 @@ export class RegistrationError extends Error {
 export async function registerUser(
   from: TelegramFrom,
   input: RegisterInput
-): Promise<{ user: User; linkedExisting: boolean }> {
+): Promise<{ user: User; linkedExisting: boolean; tempPassword: string | null }> {
   const telegramId = String(from.id);
   const email = input.email.trim().toLowerCase();
 
   const byTelegram = await resolveUser(from);
   if (byTelegram) {
-    return { user: byTelegram, linkedExisting: true };
+    return { user: byTelegram, linkedExisting: true, tempPassword: null };
   }
 
   const withEmail: User[] = await db.user.findMany({ where: { email: { not: null } } });
@@ -118,7 +150,8 @@ export async function registerUser(
       });
     }
 
-    return { user, linkedExisting: true };
+    const tempPassword = await issueTempPasswordIfMissing(user);
+    return { user, linkedExisting: true, tempPassword };
   }
 
   if (input.role === 'student') {
@@ -167,7 +200,8 @@ export async function registerUser(
       });
     }
 
-    return { user, linkedExisting: Boolean(pending.telegramId) };
+    const tempPassword = await issueTempPasswordIfMissing(user);
+    return { user, linkedExisting: Boolean(pending.telegramId), tempPassword };
   }
 
   const id = `teacher-tg-${telegramId}`;
@@ -189,7 +223,8 @@ export async function registerUser(
     role: 'teacher',
   });
 
-  return { user, linkedExisting: false };
+  const tempPassword = await issueTempPasswordIfMissing(user);
+  return { user, linkedExisting: false, tempPassword };
 }
 
 export function parseRegisterCommand(text: string): RegisterInput | null {
@@ -217,12 +252,25 @@ export function parseRegisterCommand(text: string): RegisterInput | null {
 export async function requireUser(
   from: TelegramFrom
 ): Promise<{ user: User } | { error: string }> {
-  const user = await resolveUser(from);
-  if (!user) {
+  const raw = await resolveUserIncludingSuspended(from);
+  if (raw?.suspendedAt) {
+    return {
+      error: 'This account is suspended. Contact your administrator.',
+    };
+  }
+  if (!raw) {
     return {
       error:
         'You are not signed in. Send /start to register, or /register with your details.',
     };
   }
-  return { user };
+  return { user: raw };
+}
+
+/**
+ * Set or update the password for a Telegram-linked user. Used by /setpassword.
+ */
+export async function setUserPassword(userId: string, plaintext: string): Promise<void> {
+  const hash = await hashPassword(plaintext);
+  await db.user.update({ where: { id: userId }, data: { passwordHash: hash } });
 }

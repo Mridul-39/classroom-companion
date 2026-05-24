@@ -7,17 +7,18 @@ import { CreateAssignmentModal } from "@/components/assignments/CreateAssignment
 import { PageHeader } from "@/components/ui-custom/PageHeader";
 import { Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-
-import { DEMO_TEACHER_ID } from "@/lib/constants";
+import { useSession } from "@/lib/session";
 
 export default function TeacherAssignments() {
+  const { session } = useSession();
   const [assignments, setAssignments] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const assignmentsPromise = fetch(`/api/assignments?role=teacher&teacherId=${DEMO_TEACHER_ID}`).then((res) => res.json());
-    const studentsPromise = fetch(`/api/students?teacherId=${DEMO_TEACHER_ID}`).then((res) => res.json());
+    if (!session) return;
+    const assignmentsPromise = fetch(`/api/assignments?role=teacher&teacherId=${session.userId}`).then((res) => res.json());
+    const studentsPromise = fetch(`/api/students?teacherId=${session.userId}`).then((res) => res.json());
 
     Promise.all([assignmentsPromise, studentsPromise])
       .then(([assignmentData, studentData]) => {
@@ -29,16 +30,18 @@ export default function TeacherAssignments() {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [session]);
 
   return (
     <DashboardShell role="teacher">
       <div className="flex flex-col gap-6">
-        <PageHeader 
-          title="Assignments" 
-          description="Track and manage all student assignments and tasks." 
+        <PageHeader
+          title="Assignments"
+          description="Track and manage all student assignments and tasks."
           action={
-            <CreateAssignmentModal teacherId={DEMO_TEACHER_ID} students={students} />
+            session ? (
+              <CreateAssignmentModal teacherId={session.userId} students={students} />
+            ) : null
           }
         />
 

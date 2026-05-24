@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const teacherId = searchParams.get('teacherId');
-
-  if (!teacherId) {
-    return NextResponse.json({ error: 'teacherId is required' }, { status: 400 });
+export async function GET() {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const teacherId = session.user.id;
 
   try {
     let settings = await db.appSettings.findUnique({
@@ -15,11 +15,8 @@ export async function GET(request: Request) {
     });
 
     if (!settings) {
-      // Create default settings if they don't exist
       settings = await db.appSettings.create({
-        data: {
-          teacherId,
-        }
+        data: { teacherId },
       });
     }
 
@@ -31,12 +28,11 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const teacherId = searchParams.get('teacherId');
-
-  if (!teacherId) {
-    return NextResponse.json({ error: 'teacherId is required' }, { status: 400 });
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const teacherId = session.user.id;
 
   try {
     const body = await request.json();
@@ -47,14 +43,14 @@ export async function PATCH(request: Request) {
       update: {
         llmProvider,
         llmModel,
-        encryptedApiKey, // TODO: encrypt this before saving in production
+        encryptedApiKey,
       },
       create: {
         teacherId,
         llmProvider,
         llmModel,
-        encryptedApiKey, // TODO: encrypt this before saving in production
-      }
+        encryptedApiKey,
+      },
     });
 
     return NextResponse.json({ settings });

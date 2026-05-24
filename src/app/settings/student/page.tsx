@@ -5,14 +5,16 @@ import { DashboardShell } from "@/components/layout/DashboardShell";
 import { ProfileSettings } from "@/components/settings/ProfileSettings";
 import { PageHeader } from "@/components/ui-custom/PageHeader";
 import { Loader2 } from "lucide-react";
-import { DEMO_STUDENT_ID } from "@/lib/constants";
+import { useSession } from "@/lib/session";
 
 export default function StudentSettings() {
+  const { session } = useSession();
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/student/dashboard?studentId=${DEMO_STUDENT_ID}`)
+    if (!session) return;
+    fetch(`/api/student/dashboard?studentId=${session.userId}`)
       .then(res => res.json())
       .then(data => {
         setStudent(data.student);
@@ -22,7 +24,7 @@ export default function StudentSettings() {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [session]);
 
   return (
     <DashboardShell role="student">

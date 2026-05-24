@@ -1,19 +1,34 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sendStudentInviteEmail } from '@/lib/email';
+import { getSession } from '@/lib/auth';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const teacherId = searchParams.get('teacherId');
-
-  if (!teacherId) {
-    return NextResponse.json({ error: 'teacherId is required' }, { status: 400 });
+export async function GET() {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const teacherId = session.user.id;
 
   try {
     const teacherStudents = await db.teacherStudent.findMany({
       where: { teacherId },
-      include: { student: true },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            telegramUsername: true,
+            telegramId: true,
+            suspendedAt: true,
+            schoolName: true,
+          },
+        },
+      },
     });
 
     const students = await Promise.all(
@@ -26,11 +41,12 @@ export async function GET(request: Request) {
             status: { not: 'completed' }
           }
         });
-        
+
         return {
           student,
           activeAssignments,
           status: activeAssignments > 0 ? 'Active' : 'Idle',
+          inviteCode: student.telegramId ? null : ts.inviteCode,
         };
       })
     );
@@ -43,9 +59,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const teacherId = session.user.id;
+
   try {
     const body = await request.json();
-    const { firstName, lastName, email, teacherId } = body;
+    const { firstName, lastName, email } = body;
 
     if (!firstName || !lastName || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -62,40 +84,31 @@ export async function POST(request: Request) {
       },
     });
 
-    let inviteCode: string | undefined;
-    if (teacherId) {
-      inviteCode = `INV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      await db.teacherStudent.create({
-        data: {
-          teacherId,
-          studentId: newStudentId,
-          inviteCode,
-        },
-      });
-    }
+    const inviteCode = `INV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    await db.teacherStudent.create({
+      data: {
+        teacherId,
+        studentId: newStudentId,
+        inviteCode,
+      },
+    });
 
     let emailSent = false;
-    if (teacherId) {
-      try {
-        const teacher = await db.user.findUnique({ where: { id: teacherId } });
-        const teacherName = teacher
-          ? `${teacher.firstName} ${teacher.lastName}`
-          : 'Your teacher';
-
-        const emailResult = await sendStudentInviteEmail({
-          to: email,
-          studentFirstName: firstName,
-          studentLastName: lastName,
-          teacherName,
-          inviteCode: inviteCode!,
-        });
-        emailSent = emailResult.sent;
-        if (!emailResult.sent) {
-          console.warn('Failed to send invitation email:', emailResult.reason);
-        }
-      } catch (emailError) {
-        console.error('Failed to send invitation email:', emailError);
+    try {
+      const teacherName = `${session.user.firstName} ${session.user.lastName}`;
+      const emailResult = await sendStudentInviteEmail({
+        to: email,
+        studentFirstName: firstName,
+        studentLastName: lastName,
+        teacherName,
+        inviteCode,
+      });
+      emailSent = emailResult.sent;
+      if (!emailResult.sent) {
+        console.warn('Failed to send invitation email:', emailResult.reason);
       }
+    } catch (emailError) {
+      console.error('Failed to send invitation email:', emailError);
     }
 
     return NextResponse.json({ student, emailSent }, { status: 201 });

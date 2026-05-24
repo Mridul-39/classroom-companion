@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Paperclip } from "lucide-react";
 import { Assignment } from "@/lib/types";
 import { StatusBadge } from "@/components/ui-custom/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
@@ -42,8 +42,14 @@ export function AssignmentTable({ assignments }: { assignments: Assignment[] }) 
               <TableRow key={assignment.id} className="hover:bg-zinc-50/50 transition-colors">
                 <TableCell>
                   <div className="flex flex-col max-w-xs">
-                    <Link href={`/assignments/teacher/${assignment.id}`} className="font-medium text-zinc-900 hover:text-blue-600 hover:underline transition-colors truncate">
-                      {assignment.title}
+                    <Link href={`/assignments/teacher/${assignment.id}`} className="font-medium text-zinc-900 hover:text-blue-600 hover:underline transition-colors truncate flex items-center gap-1.5">
+                      <span className="truncate">{assignment.title}</span>
+                      {assignment.attachmentUrl && (
+                        <Paperclip
+                          className="h-3.5 w-3.5 shrink-0 text-zinc-400"
+                          aria-label={assignment.attachmentName || 'Has attachment'}
+                        />
+                      )}
                     </Link>
                     <span className="text-xs text-zinc-500 truncate mt-0.5">
                       {assignment.description}

@@ -1,22 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const teacherId = searchParams.get('teacherId');
-
-  if (!teacherId) {
-    return NextResponse.json({ error: 'teacherId is required' }, { status: 400 });
+export async function GET() {
+  const session = await getSession();
+  if (!session || session.user.role !== 'teacher') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  try {
-    const teacher = await db.user.findUnique({
-      where: { id: teacherId },
-    });
+  const teacherId = session.user.id;
+  const teacher = session.user;
 
-    if (!teacher) {
-      return NextResponse.json({ error: 'Teacher not found' }, { status: 404 });
-    }
+  try {
 
     const assignmentsList = await db.assignment.findMany({
       where: { teacherId },
