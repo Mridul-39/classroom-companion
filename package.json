@@ -14,10 +14,13 @@
     "db:studio": "prisma studio",
     "db:migrate-reminder": "tsx --env-file=.env scripts/migrate-reminder-table.mjs",
     "bot": "tsx --env-file=.env src/bot/index.ts",
-    "telegram-bot": "tsx --env-file=.env src/bot/index.ts"
+    "telegram-bot": "tsx --env-file=.env src/bot/index.ts",
+    "webhook:set": "tsx --env-file=.env scripts/set-webhook.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@neondatabase/serverless": "^0.10.4",
+    "@prisma/adapter-neon": "^5.22.0",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",

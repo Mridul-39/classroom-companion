@@ -7,7 +7,24 @@
       "Bash(tasklist)",
       "Bash(findstr /I \"node tsx\")",
       "PowerShell(Get-Process *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(Get-ChildItem -Recurse -Path \"E:\\\\classroom-companion\\\\src\\\\app\" -Filter \"*.tsx\")",
+      "Bash(Select-Object FullName)",
+      "PowerShell(New-Item *)",
+      "Bash(npm ls *)",
+      "Bash(npm view *)",
+      "Bash(nslookup ep-wandering-hill-aog83gu7-pooler.c-2.ap-southeast-1.aws.neon.tech)",
+      "Bash(nslookup google.com)",
+      "Bash(nslookup ep-wandering-hill-aog83gu7-pooler.c-2.ap-southeast-1.aws.neon.tech 8.8.8.8)",
+      "Bash(where psql *)",
+      "Bash(where docker *)",
+      "Bash(Get-Service -Name \"*postgres*\" -ErrorAction SilentlyContinue)",
+      "Bash(Get-ChildItem \"C:\\\\Program Files\\\\PostgreSQL\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem \"C:\\\\Program Files \\(x86\\)\\\\PostgreSQL\" -ErrorAction SilentlyContinue)",
+      "Bash(git checkout *)",
+      "PowerShell(Get-ChildItem -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"\\(prompt|PROMPT|agent|AGENT|architecture|ARCHITECTURE\\)\" -and $_.Name -notmatch \"node_modules\" } | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object FullName -First 20)",
+      "Bash(grep -E \"^\\\\.env$|^prompts|^docs\")"
     ]
   }
 }

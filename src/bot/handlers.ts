@@ -1,4 +1,5 @@
 import type TelegramBot from 'node-telegram-bot-api';
+import { randomUUID } from 'node:crypto';
 import { format } from 'date-fns';
 import { db } from '@/lib/db';
 import { getTelegramConfig } from '@/lib/telegram/config';
@@ -32,6 +33,14 @@ import {
   resolveUser,
   setUserPassword,
 } from '@/lib/telegram/users';
+import {
+  formatEmailStatusNote,
+  InviteError,
+  inviteStudent,
+  inviteTeacher,
+  parseInviteCommand,
+} from '@/lib/telegram/invites';
+import { isAdminTeacher } from '@/lib/telegram/admin';
 import {
   buildStudentChatContext,
   buildTeacherChatContext,
@@ -70,6 +79,10 @@ function helpText(role: string, appBaseUrl: string): string {
       '*— Feedback —*\n' +
       '*/feedback* assignmentId | message\n' +
       '  Send feedback on a student submission\n\n' +
+      '*— Invite (admin only) —*\n' +
+      '*/invite* student FirstName LastName email@school.com\n' +
+      '*/invite* teacher FirstName LastName email@school.com\n' +
+      '  Example: `/invite student Riya Sharma riya@example.com`\n\n' +
       '*— Other natural language —*\n' +
       '  _"Ask Mridul to share his file for Essay of 1000 words"_\n' +
       '  _"Remind Riya about her homework"_'
@@ -102,6 +115,7 @@ const TEACHER_COMMANDS: TelegramBot.BotCommand[] = [
   { command: 'assignments', description: 'List all assignments with status' },
   { command: 'assign',      description: 'Create an assignment: student | title | description | days' },
   { command: 'feedback',    description: 'Send feedback on a submission: assignmentId | message' },
+  { command: 'invite',      description: 'Invite a student or teacher (admin only)' },
   { command: 'setpassword', description: 'Change your web login password' },
   { command: 'skip',        description: 'Cancel a pending file upload' },
 ];
@@ -259,8 +273,8 @@ export function registerHandlers(bot: TelegramBot) {
   bot.onText(/^\/skip$/i, async (msg) => {
     const from = msg.from;
     if (!from) return;
-    const had = peekPending(String(from.id));
-    clearPending(String(from.id));
+    const had = await peekPending(String(from.id));
+    await clearPending(String(from.id));
     await bot.sendMessage(
       msg.chat.id,
       had ? 'OK, no attachment.' : 'Nothing pending to skip.'
@@ -457,7 +471,7 @@ export function registerHandlers(bot: TelegramBot) {
     );
 
     if (from.id) {
-      setPending(String(from.id), { kind: 'assignment', assignmentId: assignment.id });
+      await setPending(String(from.id), { kind: 'assignment', assignmentIds: [assignment.id] });
     }
 
     await notifyUser(
@@ -465,6 +479,84 @@ export function registerHandlers(bot: TelegramBot) {
       student.id,
       `📚 New assignment from ${result.user.firstName}:\n*${title}*\nDue: ${format(assignment.dueDate, 'MMM d, yyyy')}\n\n${description}\n\nid: \`${assignment.id}\``
     );
+  });
+
+  bot.onText(/\/invite(?:\s+(.+))?/i, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const from = msg.from;
+    if (!from) return;
+
+    const result = await requireUser(from);
+    if ('error' in result) {
+      await bot.sendMessage(chatId, result.error);
+      return;
+    }
+    if (result.user.role !== 'teacher' || !isAdminTeacher(result.user)) {
+      await bot.sendMessage(chatId, 'Only the admin teacher can invite new users.');
+      return;
+    }
+
+    const args = match?.[1]?.trim();
+    if (!args) {
+      await bot.sendMessage(
+        chatId,
+        'Usage:\n`/invite student FirstName LastName email@school.com`\n`/invite teacher FirstName LastName email@school.com`',
+        { parse_mode: 'Markdown' },
+      );
+      return;
+    }
+
+    const parsed = parseInviteCommand(`/invite ${args}`);
+    if (!parsed) {
+      await bot.sendMessage(
+        chatId,
+        'Could not parse. Format:\n`/invite student FirstName LastName email@school.com`',
+        { parse_mode: 'Markdown' },
+      );
+      return;
+    }
+
+    try {
+      await bot.sendChatAction(chatId, 'typing');
+      if (parsed.role === 'student') {
+        const { student, inviteCode, emailResult } = await inviteStudent(
+          result.user,
+          parsed.firstName,
+          parsed.lastName,
+          parsed.email,
+        );
+        await bot.sendMessage(
+          chatId,
+          `✅ Invited *${escapeMarkdown(student.firstName)} ${escapeMarkdown(student.lastName)}* as a student.\n` +
+            `Invite code: \`${inviteCode}\`\n` +
+            `Register: \`/register student ${escapeMarkdown(parsed.firstName)} ${escapeMarkdown(parsed.lastName)} ${escapeMarkdown(parsed.email)} ${inviteCode}\`` +
+            formatEmailStatusNote(emailResult),
+          { parse_mode: 'Markdown' },
+        );
+      } else {
+        const { user, inviteCode, resent, emailResult } = await inviteTeacher(
+          result.user,
+          parsed.firstName,
+          parsed.lastName,
+          parsed.email,
+        );
+        await bot.sendMessage(
+          chatId,
+          `✅ ${resent ? 'Re-sent invite to' : 'Invited'} *${escapeMarkdown(user.firstName)} ${escapeMarkdown(user.lastName)}* as a teacher.\n` +
+            `Invite code: \`${inviteCode}\`\n` +
+            `Register: \`/register teacher ${escapeMarkdown(parsed.firstName)} ${escapeMarkdown(parsed.lastName)} ${escapeMarkdown(parsed.email)} ${inviteCode}\`` +
+            formatEmailStatusNote(emailResult),
+          { parse_mode: 'Markdown' },
+        );
+      }
+    } catch (err) {
+      if (err instanceof InviteError) {
+        await bot.sendMessage(chatId, err.message);
+        return;
+      }
+      console.error('Invite failed:', err);
+      await bot.sendMessage(chatId, "Sorry, I couldn't send the invite. Please try again.");
+    }
   });
 
   bot.onText(/\/myassignments/, async (msg) => {
@@ -634,7 +726,7 @@ export function registerHandlers(bot: TelegramBot) {
     );
 
     if (from.id) {
-      setPending(String(from.id), { kind: 'submission', submissionId: submission.id });
+      await setPending(String(from.id), { kind: 'submission', submissionId: submission.id });
     }
 
     const teacher = await db.user.findUnique({ where: { id: assignment.teacherId } });
@@ -761,7 +853,7 @@ export function registerHandlers(bot: TelegramBot) {
     const tgId = String(from.id);
     const pendingFile = pickAttachableFile(msg);
     if (pendingFile) {
-      const pending = consumePending(tgId);
+      const pending = await consumePending(tgId);
       if (pending) {
         try {
           await bot.sendChatAction(msg.chat.id, 'upload_document');
@@ -769,39 +861,43 @@ export function registerHandlers(bot: TelegramBot) {
           const saved = await downloadAndSaveTelegramFile(bot, pendingFile, bucket);
 
           if (pending.kind === 'assignment') {
-            await attachAssignmentFile(pending.assignmentId, saved.url, saved.name);
-            await bot.sendMessage(msg.chat.id, `📎 Attached *${escapeMarkdown(saved.name)}* to the assignment.`, {
-              parse_mode: 'Markdown',
-            });
+            const ids = pending.assignmentIds;
+            // Attach the same file (URL + name) to each assignment in the batch.
+            await Promise.all(ids.map((id) => attachAssignmentFile(id, saved.url, saved.name)));
 
-            // Relay the file to the student via Telegram and post a notice with the dashboard link.
-            const assignment = await db.assignment.findUnique({
-              where: { id: pending.assignmentId },
-            });
-            if (assignment) {
+            const attachedCountLabel =
+              ids.length === 1 ? 'the assignment' : `${ids.length} assignments`;
+            await bot.sendMessage(
+              msg.chat.id,
+              `📎 Attached *${escapeMarkdown(saved.name)}* to ${attachedCountLabel}.`,
+              { parse_mode: 'Markdown' },
+            );
+
+            // Relay the file to each student in the batch.
+            const assignments = await db.assignment.findMany({ where: { id: { in: ids } } });
+            for (const assignment of assignments) {
               const student = await db.user.findUnique({ where: { id: assignment.studentId } });
-              if (student?.telegramId) {
-                const caption = `📎 Attached to "${assignment.title}"`;
-                try {
-                  if (msg.photo) {
-                    await bot.sendPhoto(student.telegramId, pendingFile.file_id, { caption });
-                  } else {
-                    await bot.sendDocument(student.telegramId, pendingFile.file_id, { caption });
-                  }
-                } catch (relayErr) {
-                  console.warn('Direct file relay failed, sending URL instead:', relayErr);
-                  await notifyUser(
-                    bot,
-                    student.id,
-                    `📎 New attachment on *${escapeMarkdown(assignment.title)}*: ${appBaseUrl}${saved.url}`,
-                  );
+              if (!student?.telegramId) continue;
+              const caption = `📎 Attached to "${assignment.title}"`;
+              try {
+                if (msg.photo) {
+                  await bot.sendPhoto(student.telegramId, pendingFile.file_id, { caption });
+                } else {
+                  await bot.sendDocument(student.telegramId, pendingFile.file_id, { caption });
                 }
+              } catch (relayErr) {
+                console.warn('Direct file relay failed, sending URL instead:', relayErr);
                 await notifyUser(
                   bot,
                   student.id,
-                  `Open it in your dashboard: ${appBaseUrl}/assignments/student/${assignment.id}`,
+                  `📎 New attachment on *${escapeMarkdown(assignment.title)}*: ${appBaseUrl}${saved.url}`,
                 );
               }
+              await notifyUser(
+                bot,
+                student.id,
+                `Open it in your dashboard: ${appBaseUrl}/assignments/student/${assignment.id}`,
+              );
             }
           } else {
             await attachSubmissionFile(pending.submissionId, saved.url, saved.name);
@@ -907,37 +1003,95 @@ export function registerHandlers(bot: TelegramBot) {
             return;
           }
 
-          const student = await findStudentForTeacher(user.id, parsed.studentName);
-          if (!student) {
+          const requestedNames: string[] = Array.isArray(parsed.studentNames)
+            ? parsed.studentNames
+            : parsed.studentName
+              ? [parsed.studentName]
+              : [];
+
+          if (requestedNames.length === 0) {
             await bot.sendMessage(
               msg.chat.id,
-              `I couldn't find a student matching "${parsed.studentName}" in your class. Try /students to see your roster.`,
+              "I couldn't tell who this assignment is for. Please mention the student name(s) or say \"everyone\".",
             );
             return;
           }
 
-          const assignment = await createAssignmentFromBot(
-            user.id,
-            student.id,
-            parsed.title,
-            parsed.description,
-            parsed.dueDate,
-          );
+          // Resolve names to students. "__ALL__" → entire roster.
+          const wantsAll = requestedNames.some((n) => n === '__ALL__');
+          let targets: typeof roster = [];
+          const notFound: string[] = [];
 
-          setPending(String(from.id), { kind: 'assignment', assignmentId: assignment.id });
+          if (wantsAll) {
+            targets = roster;
+          } else {
+            const seen = new Set<string>();
+            for (const name of requestedNames) {
+              const s = await findStudentForTeacher(user.id, name);
+              if (s) {
+                if (!seen.has(s.id)) {
+                  seen.add(s.id);
+                  targets.push(s);
+                }
+              } else {
+                notFound.push(name);
+              }
+            }
+          }
+
+          if (targets.length === 0) {
+            await bot.sendMessage(
+              msg.chat.id,
+              `I couldn't find any matching students for: ${notFound.join(', ')}. Try /students to see your roster.`,
+            );
+            return;
+          }
+
+          const groupId = targets.length > 1 ? randomUUID() : null;
+          const createdAssignments: { id: string; student: (typeof targets)[number] }[] = [];
+          for (const student of targets) {
+            const assignment = await createAssignmentFromBot(
+              user.id,
+              student.id,
+              parsed.title,
+              parsed.description,
+              parsed.dueDate,
+              groupId,
+            );
+            createdAssignments.push({ id: assignment.id, student });
+            await notifyUser(
+              bot,
+              student.id,
+              `📚 New assignment from ${user.firstName}:\n*${escapeMarkdown(parsed.title)}*\nDue: ${format(parsed.dueDate, 'MMM d, yyyy')}\n\n${parsed.description}\n\nid: \`${assignment.id}\``,
+            );
+          }
+
+          const namesLine = createdAssignments
+            .map((c) => `*${escapeMarkdown(c.student.firstName)}*`)
+            .join(', ');
+          const notFoundNote = notFound.length
+            ? `\n\n⚠️ Skipped (not in your class): ${notFound.join(', ')}`
+            : '';
+
+          await setPending(String(from.id), {
+            kind: 'assignment',
+            assignmentIds: createdAssignments.map((c) => c.id),
+          });
+
+          const headLine =
+            createdAssignments.length === 1
+              ? `Created *${escapeMarkdown(parsed.title)}* for ${namesLine}`
+              : `Created *${escapeMarkdown(parsed.title)}* for ${createdAssignments.length} students: ${namesLine}`;
 
           await bot.sendMessage(
             msg.chat.id,
-            `Created *${escapeMarkdown(parsed.title)}* for *${escapeMarkdown(student.firstName)}* ` +
+            `${headLine} ` +
               `(due ${format(parsed.dueDate, 'MMM d, yyyy')}).\n\n` +
-              '📎 Send a file/image in the next 60 seconds to attach it, or `/skip` to finish.',
+              '📎 Send a file/image in the next 60 seconds — it will be attached to ' +
+              (createdAssignments.length === 1 ? 'the assignment' : 'all of them') +
+              '. Or send `/skip` to finish.' +
+              notFoundNote,
             { parse_mode: 'Markdown' },
-          );
-
-          await notifyUser(
-            bot,
-            student.id,
-            `📚 New assignment from ${user.firstName}:\n*${escapeMarkdown(parsed.title)}*\nDue: ${format(parsed.dueDate, 'MMM d, yyyy')}\n\n${parsed.description}\n\nid: \`${assignment.id}\``,
           );
           return;
         }
@@ -987,7 +1141,7 @@ export function registerHandlers(bot: TelegramBot) {
         });
 
         if (latestSubmission) {
-          setPending(String(student.telegramId), { kind: 'submission', submissionId: latestSubmission.id });
+          await setPending(String(student.telegramId), { kind: 'submission', submissionId: latestSubmission.id });
         }
 
         await notifyUser(
@@ -1021,7 +1175,7 @@ export function registerHandlers(bot: TelegramBot) {
         const assignment = findAssignmentInText(text, studentAssignments);
         if (assignment) {
           const { submission } = await addSubmission(assignment.id, user.id, text);
-          setPending(tgId, { kind: 'submission', submissionId: submission.id });
+          await setPending(tgId, { kind: 'submission', submissionId: submission.id });
 
           await bot.sendMessage(
             msg.chat.id,

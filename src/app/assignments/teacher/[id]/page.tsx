@@ -11,7 +11,7 @@ import { SubmissionPanel } from "@/components/assignments/SubmissionPanel";
 import { FeedbackPanel } from "@/components/assignments/FeedbackPanel";
 import { EmptyState } from "@/components/ui-custom/EmptyState";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, Bell, SearchX, Mail, MessageSquare, Loader2, FileIcon } from "lucide-react";
+import { ArrowLeft, Clock, Bell, SearchX, Mail, MessageSquare, Loader2, FileIcon, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +22,8 @@ export default function TeacherAssignmentDetail() {
   const [feedbackItems, setFeedbackItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [reminderState, setReminderState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [reminderError, setReminderError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/assignments/${id}`)
@@ -126,6 +128,29 @@ export default function TeacherAssignmentDetail() {
     }
   };
 
+  const handleSendReminder = async () => {
+    setReminderState('sending');
+    setReminderError(null);
+    try {
+      const res = await fetch('/api/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setReminderState('error');
+        setReminderError(result.error ?? 'Failed to send reminder');
+      } else {
+        setReminderState('sent');
+        setTimeout(() => setReminderState('idle'), 3000);
+      }
+    } catch {
+      setReminderState('error');
+      setReminderError('Could not reach the server');
+    }
+  };
+
   return (
     <DashboardShell role="teacher">
       <div className="flex flex-col gap-8">
@@ -146,12 +171,29 @@ export default function TeacherAssignmentDetail() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <StatusBadge status={assignment.status} />
-              <Button variant="outline" size="sm" className="gap-2 shadow-sm border-zinc-200">
-                <Bell className="h-4 w-4 text-zinc-500" />
-                Send Reminder
-              </Button>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-3">
+                <StatusBadge status={assignment.status} />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 shadow-sm border-zinc-200"
+                  onClick={handleSendReminder}
+                  disabled={reminderState === 'sending' || assignment.status === 'completed'}
+                >
+                  {reminderState === 'sending' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : reminderState === 'sent' ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Bell className="h-4 w-4 text-zinc-500" />
+                  )}
+                  {reminderState === 'sent' ? 'Reminder sent' : 'Send Reminder'}
+                </Button>
+              </div>
+              {reminderState === 'error' && reminderError && (
+                <p className="text-xs text-red-600">{reminderError}</p>
+              )}
             </div>
           </div>
         </div>

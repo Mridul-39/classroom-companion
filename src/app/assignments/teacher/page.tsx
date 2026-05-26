@@ -17,8 +17,9 @@ export default function TeacherAssignments() {
 
   useEffect(() => {
     if (!session) return;
-    const assignmentsPromise = fetch(`/api/assignments?role=teacher&teacherId=${session.userId}`).then((res) => res.json());
-    const studentsPromise = fetch(`/api/students?teacherId=${session.userId}`).then((res) => res.json());
+    const teacherId = session.userId;
+    const assignmentsPromise = fetch(`/api/assignments?role=teacher&teacherId=${teacherId}`).then((res) => res.json());
+    const studentsPromise = fetch(`/api/students?teacherId=${teacherId}`).then((res) => res.json());
 
     Promise.all([assignmentsPromise, studentsPromise])
       .then(([assignmentData, studentData]) => {
@@ -39,9 +40,7 @@ export default function TeacherAssignments() {
           title="Assignments"
           description="Track and manage all student assignments and tasks."
           action={
-            session ? (
-              <CreateAssignmentModal teacherId={session.userId} students={students} />
-            ) : null
+            <CreateAssignmentModal teacherId={session?.userId ?? ''} students={students} />
           }
         />
 

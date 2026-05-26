@@ -47,7 +47,8 @@ export async function listStudentsForTeacher(teacherId: string): Promise<User[]>
 }
 
 /** Only students linked to this teacher via TeacherStudent. */
-export async function findStudentForTeacher(teacherId: string, query: string) {
+export async function findStudentForTeacher(teacherId: string, query: string | null | undefined) {
+  if (!query) return null;
   const students = await listStudentsForTeacher(teacherId);
   const q = query.trim().toLowerCase().replace(/^@/, '');
   if (!q || q.length < 2) return null;
@@ -84,7 +85,8 @@ export async function createAssignmentFromBot(
   studentId: string,
   title: string,
   description: string,
-  dueDate: Date
+  dueDate: Date,
+  groupId?: string | null,
 ) {
   await assertTeacherOwnsStudent(teacherId, studentId);
 
@@ -96,6 +98,7 @@ export async function createAssignmentFromBot(
       description,
       dueDate,
       status: 'in_progress',
+      ...(groupId ? { groupId } : {}),
     },
   });
 }

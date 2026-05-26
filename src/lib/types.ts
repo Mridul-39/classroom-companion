@@ -55,9 +55,7 @@ export type Submission = {
   id: string;
   assignmentId: string;
   studentId: string;
-  content?: string | null;
-  fileName?: string | null;
-  fileUrl?: string | null;
+  content: string; // text or file URL mock
   submittedAt: string;
 };
 

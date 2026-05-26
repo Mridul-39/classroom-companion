@@ -7,10 +7,12 @@ const MAX_BYTES = 20 * 1024 * 1024; // 20 MB — Telegram bot API download cap
 const PENDING_TTL_MS = 60 * 1000;
 
 export type PendingAttachmentInput =
-  | { kind: 'assignment'; assignmentId: string }
+  | { kind: 'assignment'; assignmentId?: string; assignmentIds?: string[] }
   | { kind: 'submission'; submissionId: string };
 
-export type PendingAttachment = PendingAttachmentInput & { expiresAt: number };
+export type PendingAttachment =
+  | { kind: 'assignment'; assignmentIds: string[]; expiresAt: number }
+  | { kind: 'submission'; submissionId: string; expiresAt: number };
 
 const pending = new Map<string, PendingAttachment>();
 
@@ -23,7 +25,14 @@ function gc() {
 
 export function setPending(telegramId: string, state: PendingAttachmentInput) {
   gc();
-  pending.set(telegramId, { ...state, expiresAt: Date.now() + PENDING_TTL_MS });
+  const expiresAt = Date.now() + PENDING_TTL_MS;
+  if (state.kind === 'assignment') {
+    const ids = state.assignmentIds ?? (state.assignmentId ? [state.assignmentId] : []);
+    if (ids.length === 0) return;
+    pending.set(telegramId, { kind: 'assignment', assignmentIds: ids, expiresAt });
+  } else {
+    pending.set(telegramId, { kind: 'submission', submissionId: state.submissionId, expiresAt });
+  }
 }
 
 export function consumePending(telegramId: string): PendingAttachment | null {
